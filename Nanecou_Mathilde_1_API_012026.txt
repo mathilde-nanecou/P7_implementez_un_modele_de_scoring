@@ -1,2 +1,3 @@
-https://api-scoring-mathilde.onrender.com/
+
+https://api-scoring-credit-mathilde.onrender.com
 https://api-scoring-mathilde.onrender.com/predict?id=100002
