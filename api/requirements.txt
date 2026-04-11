@@ -15,3 +15,5 @@ shap==0.41.0
 
 # --- Utilitaires ---
 joblib==1.2.0
+
+flask-cors
