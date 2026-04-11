@@ -1,3 +1,4 @@
-
 https://api-scoring-credit-mathilde.onrender.com
 https://api-scoring-mathilde.onrender.com/predict?id=100002
+
+https://p7implementezunmodeledescoringgit-g9hnqw8tm4xsjga6vrtwzm.streamlit.app/
