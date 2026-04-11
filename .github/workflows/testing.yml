@@ -28,7 +28,6 @@ jobs:
       run: |
         pytest tests/
 
-  # Déploiement automatique sur Render après succès des tests
   deploy:
     needs: test_api
     runs-on: ubuntu-latest
@@ -42,5 +41,5 @@ jobs:
         if [ -n "$RENDER_HOOK" ]; then
           curl -X POST "$RENDER_HOOK"
         else
-          echo "⚠️ Secret RENDER_DEPLOY_HOOK non configuré, déploiement ignoré."
+          echo "Secret RENDER_DEPLOY_HOOK non configuré, déploiement ignoré."
         fi
