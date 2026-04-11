@@ -11,3 +11,4 @@ shap==0.46.0
 gunicorn
 pytest==9.0.2
 evidently==0.4.15
+pyarrow==14.0.1
