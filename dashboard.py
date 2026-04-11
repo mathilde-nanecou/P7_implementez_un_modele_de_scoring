@@ -13,7 +13,7 @@ import os
 # 1. CONFIGURATION ET CHARGEMENT DES DONNÉES
 # -----------------------------------------------------------
 # API Render
-API_URL = "https://api-scoring-credit-mathilde.onrender.com"
+API_URL = "https://api-scoring-credit-mathilde.onrender.com/predict"
 
 st.set_page_config(page_title="Dashboard Scoring Crédit", layout="wide")
 
