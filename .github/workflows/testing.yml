@@ -36,6 +36,7 @@ jobs:
 
     steps:
     - name: Déploiement sur Render
+      if: ${{ secrets.RENDER_DEPLOY_HOOK != '' }}
       run: |
         # On envoie un POST au webhook Render pour déclencher le redéploiement
         curl -X POST "${{ secrets.RENDER_DEPLOY_HOOK }}"
