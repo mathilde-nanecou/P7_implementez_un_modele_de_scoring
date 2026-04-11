@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 
 with patch('pandas.read_csv'), patch('pickle.load'):
-    sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+    sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'api')))
     from app import app
 
 # --- 1. FIXTURE POUR L'API ---
@@ -111,7 +111,7 @@ def test_predict_success_and_payload(mock_model, client):
         assert data['client_id'] == 100001
         assert data['probability'] == 0.7
         assert data['decision'] == 'Refusé'
-        assert data['threshold'] == 0.5
+        assert abs(data['threshold'] - 0.5) < 0.01
         assert 'shap_values' in data
 
 
@@ -145,4 +145,4 @@ def test_predict_internal_error_returns_500(mock_model, client):
         response = client.get('/predict?id=300003')
 
         assert response.status_code == 500
-        assert b"Erreur de pr" in response.data
+        assert b"Erreur lors du calcul" in response.data

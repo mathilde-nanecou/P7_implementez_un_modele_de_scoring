@@ -9,7 +9,7 @@ from sklearn.metrics import confusion_matrix
 # On empêche le chargement réel du modèle et des données lors de l'import
 # Cela permet de passer les tests même si les fichiers sont absents sur GitHub
 with patch('pandas.read_csv'), patch('pickle.load'):
-    sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+    sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'api')))
     from app import app
 
 # --- 1. FIXTURE POUR L'API ---
