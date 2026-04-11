@@ -1,0 +1,6 @@
+{
+  "threshold": 0.49999999999999994,
+  "source": "notebook_v2_business_cost_optimization",
+  "cost_fn": 10,
+  "cost_fp": 1
+}

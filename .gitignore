@@ -1,0 +1,32 @@
+# dossier MLflow
+mlruns/
+notebooks/mlruns/
+
+# fichiers temporaires Python
+__pycache__/
+*.pyc
+
+# sauvegardes automatiques de Notebooks
+.ipynb_checkpoints/
+
+
+*- Copie.ipynb
+*.bak
+*.tmp
+
+
+p7_env/
+env/
+venv/
+
+#  tous les CSV du dossier data/
+data/*.csv
+api/data/*.csv
+streamlit_app/data/*.csv
+
+!data/sample_test.csv
+!data/application_test.csv
+!api/data/application_test.csv
+!api/data/sample_test.csv
+!streamlit/data/sample_test.csv
+!streamlit/data/application_test.csv

@@ -1,0 +1,11 @@
+Flask
+streamlit
+requests
+matplotlib
+seaborn
+pandas
+numpy
+lightgbm
+scikit-learn
+gunicorn
+pytest
