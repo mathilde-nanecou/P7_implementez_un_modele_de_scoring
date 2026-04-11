@@ -52,11 +52,17 @@ def load_model():
 @st.cache_data
 def load_feature_importances():
     """Charge les importances depuis le dossier api/data/"""
-    path = 'api/data/feature_importances.csv'
-    if os.path.exists(path):
-        return pd.read_csv(path)
-    else:
-        return None
+    base = os.path.dirname(os.path.abspath(__file__))
+    candidates = [
+        os.path.join(base, 'api', 'data', 'feature_importances.csv'),
+        os.path.join(base, '..', 'api', 'data', 'feature_importances.csv'),
+        os.path.join(base, 'data', 'feature_importances.csv'),
+        'api/data/feature_importances.csv',
+    ]
+    for path in candidates:
+        if os.path.exists(path):
+            return pd.read_csv(path)
+    return None
 
 df = load_data()
 model = load_model()
