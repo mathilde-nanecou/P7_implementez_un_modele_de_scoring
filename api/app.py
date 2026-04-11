@@ -2,6 +2,7 @@ import pickle
 import json
 import pandas as pd
 from flask import Flask, jsonify, request
+from flask_cors import CORS
 import os
 import sys
 
@@ -13,7 +14,7 @@ except ImportError:
     SHAP_AVAILABLE = False
 
 app = Flask(__name__)
-
+CORS(app)
 # =========================================================
 # 1. CONFIGURATION DES CHEMINS (Adaptés au dossier /api)
 # =========================================================
