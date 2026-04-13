@@ -55,11 +55,7 @@ st.divider()
 st.sidebar.header("🔍 Sélection Client")
 
 if not df.empty:
-    # On récupère les IDs uniques et on les trie
-    available_ids = sorted(df['SK_ID_CURR'].unique())
-    
-    # Sélection via liste déroulante (évite les erreurs de frappe)
-    selected_id = st.sidebar.selectbox("Choisir l'ID du client :", available_ids)
+    selected_id = st.sidebar.number_input("Entrer l'ID du client :", min_value=0, step=1, format="%d")
 
     if st.sidebar.button("Évaluer le dossier"):
         st.header(f"🔎 Analyse du Client {selected_id}")
