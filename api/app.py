@@ -75,6 +75,51 @@ except Exception as e:
 # 3. ROUTES
 # =========================================================
 
+
+def prepare_client_features(client_frame):
+    expected_features = model.feature_name_
+    client_data_clean = client_frame.select_dtypes(exclude=['object'])
+    return client_data_clean.reindex(columns=expected_features, fill_value=0)
+
+
+def compute_shap_top(client_data_final, expected_features):
+    shap_top = []
+    if explainer is not None:
+        try:
+            shap_vals = explainer.shap_values(client_data_final)
+
+            if isinstance(shap_vals, list):
+                sv = shap_vals[1][0]
+            else:
+                sv = shap_vals[0]
+
+            indices = sorted(range(len(sv)), key=lambda i: abs(sv[i]), reverse=True)[:10]
+            for i in indices:
+                shap_top.append({
+                    "feature": expected_features[i],
+                    "shap_value": float(sv[i])
+                })
+        except Exception as e:
+            print(f"Erreur SHAP : {e}")
+    return shap_top
+
+
+def compute_prediction_payload(client_data_final, client_id, include_shap=True):
+    expected_features = model.feature_name_
+    probability = model.predict_proba(client_data_final)[0][1]
+    decision = "Refusé" if probability > OPTIMAL_THRESHOLD else "Accordé"
+
+    payload = {
+        "status": "success",
+        "client_id": int(client_id),
+        "probability": round(float(probability), 4),
+        "decision": decision,
+        "threshold": OPTIMAL_THRESHOLD,
+    }
+    if include_shap:
+        payload["shap_values"] = compute_shap_top(client_data_final, expected_features)
+    return payload
+
 @app.route('/')
 def index():
     return "<h1>API de Scoring Crédit active.</h1><p>Utilisez /predict?id=XXXXXX</p>"
@@ -99,54 +144,50 @@ def predict():
         return jsonify({"error": f"Client ID {client_id} non trouvé"}), 404
 
     try:
-        # 1. ALIGNEMENT DES FEATURES
-        # Récupération des colonnes que le modèle attend
-        expected_features = model.feature_name_
-        
-        # Nettoyage et alignement
-        client_data_clean = client_row.select_dtypes(exclude=['object'])
-        client_data_final = client_data_clean.reindex(columns=expected_features, fill_value=0)
-
-        # 2. PRÉDICTION
-        probability = model.predict_proba(client_data_final)[0][1]
-        decision = "Refusé" if probability > OPTIMAL_THRESHOLD else "Accordé"
-
-        # 3. SHAP (Interprétabilité locale)
-        shap_top = []
-        if explainer is not None:
-            try:
-                # Calcul des valeurs SHAP pour ce client précis
-                shap_vals = explainer.shap_values(client_data_final)
-                
-                # Gestion du format de sortie SHAP (LightGBM renvoie souvent une liste pour binary class)
-                if isinstance(shap_vals, list):
-                    sv = shap_vals[1][0] # On prend la classe 1 (défaut)
-                else:
-                    sv = shap_vals[0]
-
-                # Extraction du Top 10 des variables influentes
-                # On trie par valeur absolue pour avoir l'impact (positif ou négatif)
-                indices = sorted(range(len(sv)), key=lambda i: abs(sv[i]), reverse=True)[:10]
-                
-                for i in indices:
-                    shap_top.append({
-                        "feature": expected_features[i],
-                        "shap_value": float(sv[i])
-                    })
-            except Exception as e:
-                print(f"Erreur SHAP : {e}")
-
-        return jsonify({
-            "status": "success",
-            "client_id": id_int,
-            "probability": round(float(probability), 4),
-            "decision": decision,
-            "threshold": OPTIMAL_THRESHOLD,
-            "shap_values": shap_top
-        })
+        client_data_final = prepare_client_features(client_row)
+        return jsonify(compute_prediction_payload(client_data_final, id_int, include_shap=True))
 
     except Exception as e:
         return jsonify({"error": f"Erreur lors du calcul : {str(e)}"}), 500
+
+
+@app.route('/simulate', methods=['POST'])
+def simulate_prediction():
+    if df is None or model is None:
+        return jsonify({"error": "Modèle ou données non chargés sur le serveur"}), 500
+
+    payload = request.get_json(silent=True) or {}
+    client_id = payload.get('id')
+    overrides = payload.get('overrides', {})
+
+    if client_id is None:
+        return jsonify({"error": "Champ 'id' manquant"}), 400
+
+    try:
+        id_int = int(client_id)
+    except (ValueError, TypeError):
+        return jsonify({"error": "ID client doit être un nombre"}), 400
+
+    if not isinstance(overrides, dict):
+        return jsonify({"error": "Le champ 'overrides' doit être un objet JSON"}), 400
+
+    client_row = df[df['SK_ID_CURR'] == id_int]
+    if client_row.empty:
+        return jsonify({"error": f"Client ID {client_id} non trouvé"}), 404
+
+    try:
+        simulated_row = client_row.copy()
+        for feature, value in overrides.items():
+            if feature not in simulated_row.columns:
+                return jsonify({"error": f"Variable inconnue: {feature}"}), 400
+            simulated_row.loc[:, feature] = value
+
+        client_data_final = prepare_client_features(simulated_row)
+        result = compute_prediction_payload(client_data_final, id_int, include_shap=False)
+        result["overrides_applied"] = overrides
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"error": f"Erreur lors de la simulation : {str(e)}"}), 500
 
 if __name__ == '__main__':
     # Configuration pour Render

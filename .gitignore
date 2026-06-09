@@ -31,3 +31,7 @@ streamlit_app/data/*.csv
 !api/data/feature_importances.csv
 !streamlit/data/sample_test.csv
 !streamlit/data/application_test.csv
+
+# Gros CSV dans P7_modele_scoring
+P7_modele_scoring/api/data/*.csv
+p7_implementez_un_modele_de_scoring_MN/
