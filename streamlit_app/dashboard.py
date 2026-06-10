@@ -22,11 +22,11 @@ st.set_page_config(
 # ===========================================================================
 API_PREDICT_URL = os.getenv(
     "SCORING_API_PREDICT_URL",
-    "https://api-scoring-mathilde.onrender.com/predict",
+    "https://api-scoring-credit-mathilde.onrender.com/predict",
 )
 API_SIMULATE_URL = os.getenv(
     "SCORING_API_SIMULATE_URL",
-    "https://api-scoring-mathilde.onrender.com/simulate",
+    "https://api-scoring-credit-mathilde.onrender.com/simulate",
 )
 
 # ===========================================================================
