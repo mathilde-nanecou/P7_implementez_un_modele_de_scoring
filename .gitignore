@@ -15,7 +15,7 @@ __pycache__/
 *.tmp
 
 
-p7_env/
+p8_env/
 env/
 venv/
 
@@ -29,8 +29,9 @@ streamlit_app/data/*.csv
 !api/data/application_test.csv
 !api/data/sample_test.csv
 !api/data/feature_importances.csv
-!streamlit/data/sample_test.csv
-!streamlit/data/application_test.csv
+!streamlit_app/data/sample_test.csv
+!streamlit_app/data/application_test.csv
+!streamlit_app/data/feature_importances.csv
 
 # Gros CSV dans P7_modele_scoring
 P7_modele_scoring/api/data/*.csv

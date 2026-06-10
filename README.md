@@ -1,4 +1,4 @@
-# Projet 7 - Systeme de Scoring Credit (MLOps)
+# Projet 8 - Dashboard de Credit Scoring
 
 ![Python](https://img.shields.io/badge/python-3.11-blue.svg)
 ![Flask](https://img.shields.io/badge/flask-3.1-black.svg)
@@ -164,20 +164,20 @@ Conclusion actuelle : drift present mais modere, monitoring mensuel recommande e
 
 ## Installation locale
 
-Le projet contient deja un environnement virtuel local p7_env.
+Le projet contient deja un environnement virtuel local p8_env.
 
 ### Option A - Utiliser l'environnement existant (Windows)
 
 ```powershell
-.\p7_env\Scripts\Activate.ps1
+.\p8_env\Scripts\Activate.ps1
 pip install -r requirements.txt
 ```
 
 ### Option B - Creer un nouvel environnement
 
 ```powershell
-python -m venv p7_env
-.\p7_env\Scripts\Activate.ps1
+python -m venv p8_env
+.\p8_env\Scripts\Activate.ps1
 pip install -r requirements.txt
 ```
 

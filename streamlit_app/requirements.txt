@@ -5,6 +5,7 @@ matplotlib
 seaborn
 pandas
 numpy
+plotly
 lightgbm
 scikit-learn
 gunicorn
