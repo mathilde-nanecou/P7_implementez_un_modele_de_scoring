@@ -26,6 +26,7 @@ streamlit_app/data/*.csv
 
 !data/sample_test.csv
 !data/application_test.csv
+!data/feature_importances.csv
 !api/data/application_test.csv
 !api/data/sample_test.csv
 !api/data/feature_importances.csv
