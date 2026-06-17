@@ -110,7 +110,9 @@ def predict():
         try:
             # pred_contrib renvoie un tableau (1, n_features + 1) :
             # les n_features contributions + la valeur de base en dernière colonne.
-            contribs = model.booster_.predict(client_data_final, pred_contrib=True)
+            contribs = model.booster_.predict(
+                client_data_final.values, pred_contrib=True
+            )
             sv = contribs[0][:-1]  # on retire la valeur de base
         except Exception as shap_err:
             print(f"⚠️ pred_contrib indisponible : {shap_err}")

@@ -93,7 +93,10 @@ def compute_shap_top(client_data_final, expected_features):
 
     try:
         # pred_contrib -> tableau (1, n_features + 1) : contributions + valeur de base.
-        contribs = model.booster_.predict(client_data_final, pred_contrib=True)
+        # On passe les valeurs numpy brutes pour compatibilité maximale.
+        contribs = model.booster_.predict(
+            client_data_final.values, pred_contrib=True
+        )
         sv = contribs[0][:-1]  # on retire la valeur de base (dernière colonne)
     except Exception as e:
         print(f"⚠️ pred_contrib indisponible, repli sur shap : {e}")
