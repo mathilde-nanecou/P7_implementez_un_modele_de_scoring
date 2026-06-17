@@ -83,24 +83,37 @@ def prepare_client_features(client_frame):
 
 
 def compute_shap_top(client_data_final, expected_features):
+    # Interprétabilité locale : on calcule en priorité les contributions SHAP
+    # via le moteur natif de LightGBM (pred_contrib=True). Il renvoie exactement
+    # les mêmes valeurs que la librairie shap, sans dépendre de TreeExplainer,
+    # ce qui est plus léger en mémoire et plus fiable en production (Render).
+    # La librairie shap reste un repli de secours.
     shap_top = []
-    if explainer is not None:
-        try:
-            shap_vals = explainer.shap_values(client_data_final)
+    sv = None
 
-            if isinstance(shap_vals, list):
-                sv = shap_vals[1][0]
-            else:
-                sv = shap_vals[0]
+    try:
+        # pred_contrib -> tableau (1, n_features + 1) : contributions + valeur de base.
+        contribs = model.booster_.predict(client_data_final, pred_contrib=True)
+        sv = contribs[0][:-1]  # on retire la valeur de base (dernière colonne)
+    except Exception as e:
+        print(f"⚠️ pred_contrib indisponible, repli sur shap : {e}")
+        if explainer is not None:
+            try:
+                shap_vals = explainer.shap_values(client_data_final)
+                if isinstance(shap_vals, list):
+                    sv = shap_vals[1][0]
+                else:
+                    sv = shap_vals[0]
+            except Exception as e2:
+                print(f"Erreur SHAP : {e2}")
 
-            indices = sorted(range(len(sv)), key=lambda i: abs(sv[i]), reverse=True)[:10]
-            for i in indices:
-                shap_top.append({
-                    "feature": expected_features[i],
-                    "shap_value": float(sv[i])
-                })
-        except Exception as e:
-            print(f"Erreur SHAP : {e}")
+    if sv is not None:
+        indices = sorted(range(len(sv)), key=lambda i: abs(sv[i]), reverse=True)[:10]
+        for i in indices:
+            shap_top.append({
+                "feature": expected_features[i],
+                "shap_value": float(sv[i])
+            })
     return shap_top
 
 

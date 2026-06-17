@@ -101,23 +101,37 @@ def predict():
         decision = "Refusé" if probability > threshold else "Accordé"
 
         # 4. SHAP : interprétabilité locale (top 10 features)
+        # On utilise en priorité le calcul natif de LightGBM (pred_contrib=True) :
+        # il renvoie exactement les mêmes valeurs SHAP que la librairie shap,
+        # sans dépendre de TreeExplainer (plus léger en mémoire et plus fiable
+        # en production sur Render). La librairie shap reste un repli de secours.
         shap_top = []
-        if explainer is not None:
-            try:
-                shap_vals = explainer.shap_values(client_data_final)
-                # shap_vals peut être une liste [class0, class1] ou un array
-                if isinstance(shap_vals, list):
-                    sv = shap_vals[1][0]
-                else:
-                    sv = shap_vals[0]
-                # Top 10 features par valeur absolue
-                top_idx = sorted(range(len(sv)), key=lambda i: abs(sv[i]), reverse=True)[:10]
-                shap_top = [
-                    {"feature": expected_features[i], "shap_value": round(float(sv[i]), 6)}
-                    for i in top_idx
-                ]
-            except Exception:
-                pass  # SHAP optionnel, ne bloque pas la prédiction
+        sv = None
+        try:
+            # pred_contrib renvoie un tableau (1, n_features + 1) :
+            # les n_features contributions + la valeur de base en dernière colonne.
+            contribs = model.booster_.predict(client_data_final, pred_contrib=True)
+            sv = contribs[0][:-1]  # on retire la valeur de base
+        except Exception as shap_err:
+            print(f"⚠️ pred_contrib indisponible : {shap_err}")
+            # Repli : librairie shap si l'explainer a pu être initialisé
+            if explainer is not None:
+                try:
+                    shap_vals = explainer.shap_values(client_data_final)
+                    if isinstance(shap_vals, list):
+                        sv = shap_vals[1][0]
+                    else:
+                        sv = shap_vals[0]
+                except Exception as exp_err:
+                    print(f"⚠️ shap fallback indisponible : {exp_err}")
+
+        if sv is not None:
+            # Top 10 features par valeur absolue
+            top_idx = sorted(range(len(sv)), key=lambda i: abs(sv[i]), reverse=True)[:10]
+            shap_top = [
+                {"feature": expected_features[i], "shap_value": round(float(sv[i]), 6)}
+                for i in top_idx
+            ]
 
         return jsonify({
             "status": "success",
