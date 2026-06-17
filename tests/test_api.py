@@ -62,7 +62,6 @@ def test_predict_error_cases(mock_df, mock_model, client):
     assert client.get('/predict?id=abc').status_code == 400
 
 
-@patch('app.explainer', None)
 @patch('app.model')
 def test_predict_client_not_found(mock_model, client):
     df_clients = pd.DataFrame([{'SK_ID_CURR': 123456, 'NUM_FEATURE_1': 10.0}])
@@ -73,7 +72,6 @@ def test_predict_client_not_found(mock_model, client):
         assert b"non trouv" in response.data
 
 
-@patch('app.explainer', None)
 @patch('app.model')
 def test_predict_success_and_payload(mock_model, client):
     df_client = pd.DataFrame([{
@@ -98,7 +96,6 @@ def test_predict_success_and_payload(mock_model, client):
         assert 'shap_values' in data
 
 
-@patch('app.explainer', None)
 @patch('app.model')
 def test_predict_decision_threshold(mock_model, client):
     df_client = pd.DataFrame([{'SK_ID_CURR': 200002, 'NUM_FEATURE_1': 1.0}])
@@ -114,7 +111,6 @@ def test_predict_decision_threshold(mock_model, client):
         assert data['decision'] == 'Accordé'
 
 
-@patch('app.explainer', None)
 @patch('app.model')
 def test_predict_internal_error_returns_500(mock_model, client):
     df_client = pd.DataFrame([{'SK_ID_CURR': 300003, 'NUM_FEATURE_1': 1.0}])
