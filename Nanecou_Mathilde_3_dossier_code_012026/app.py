@@ -2,151 +2,146 @@ import pickle
 import json
 import pandas as pd
 from flask import Flask, jsonify, request
+from flask_cors import CORS
 import os
 
-try:
-    import shap
-    SHAP_AVAILABLE = True
-except ImportError:
-    SHAP_AVAILABLE = False
-
 app = Flask(__name__)
+CORS(app)
 
-# Configuration des chemins
 MODEL_PATH = 'model_lgbm.pkl'
 DATA_PATH = 'data/application_test.csv'
 THRESHOLD_PATH = 'threshold.json'
 
-# =========================================================
-# 1. CHARGEMENT
-# =========================================================
-print("⏳ Démarrage de l'API...")
-
-# A. Chargement du Modèle
+model = None
 try:
     with open(MODEL_PATH, 'rb') as f:
         model = pickle.load(f)
-    print(f"✅ Modèle chargé")
+    print("Modele charge")
 except Exception as e:
-    print(f"❌ Erreur modèle: {e}")
-    model = None
+    print(f"Erreur chargement modele : {e}")
 
-# A-bis. Explainer SHAP (interprétabilité locale)
-explainer = None
-if model is not None and SHAP_AVAILABLE:
-    try:
-        explainer = shap.TreeExplainer(model)
-        print("✅ Explainer SHAP initialisé")
-    except Exception as e:
-        print(f"⚠️ SHAP indisponible : {e}")
-
-# B. Chargement des Données
+df = None
 try:
     df = pd.read_csv(DATA_PATH)
     if 'TARGET' in df.columns:
         df = df.drop(columns=['TARGET'])
-    print(f"✅ Données clients chargées ({df.shape[0]} entrées)")
+    print(f"Donnees chargees ({df.shape[0]} clients)")
 except Exception as e:
-    print(f"❌ Erreur données: {e}")
-    df = None
+    print(f"Erreur chargement donnees : {e}")
 
-# C. Chargement du seuil optimal (calculé dans le notebook)
+OPTIMAL_THRESHOLD = 0.5
 try:
-    with open(THRESHOLD_PATH, 'r') as f:
-        OPTIMAL_THRESHOLD = json.load(f)['threshold']
-    print(f"✅ Seuil optimal chargé : {OPTIMAL_THRESHOLD}")
+    if os.path.exists(THRESHOLD_PATH):
+        with open(THRESHOLD_PATH, 'r') as f:
+            OPTIMAL_THRESHOLD = json.load(f)['threshold']
+        print(f"Seuil charge : {OPTIMAL_THRESHOLD}")
 except Exception as e:
-    OPTIMAL_THRESHOLD = 0.5  # valeur par défaut si le fichier manque
-    print(f"⚠️ Seuil par défaut utilisé ({OPTIMAL_THRESHOLD}) : {e}")
+    print(f"Seuil par defaut utilise (0.5) : {e}")
 
-# =========================================================
-# 2. ROUTES
-# =========================================================
+
+def prepare_client_features(client_frame):
+    expected_features = model.feature_name_
+    clean = client_frame.select_dtypes(exclude=['object'])
+    return clean.reindex(columns=expected_features, fill_value=0)
+
+
+def get_shap_top(client_data, expected_features):
+    shap_top = []
+    try:
+        contribs = model.booster_.predict(client_data.values, pred_contrib=True)
+        sv = contribs[0][:-1]
+        indices = sorted(range(len(sv)), key=lambda i: abs(sv[i]), reverse=True)[:10]
+        for i in indices:
+            shap_top.append({"feature": expected_features[i], "shap_value": float(sv[i])})
+    except Exception as e:
+        print(f"SHAP indisponible : {e}")
+    return shap_top
+
+
+def build_payload(client_data, client_id, include_shap=True):
+    features = model.feature_name_
+    prob = model.predict_proba(client_data)[0][1]
+    decision = "Refusé" if prob > OPTIMAL_THRESHOLD else "Accordé"
+    result = {
+        "status": "success",
+        "client_id": int(client_id),
+        "probability": round(float(prob), 4),
+        "decision": decision,
+        "threshold": OPTIMAL_THRESHOLD,
+    }
+    if include_shap:
+        result["shap_values"] = get_shap_top(client_data, features)
+    return result
+
 
 @app.route('/')
 def index():
-    return "<h1>API de Scoring Crédit active.</h1><p>Utilisez /predict?id=XXXXXX</p>"
+    return "<h1>API de Scoring Crédit</h1><p>Utilisez /predict?id=XXXXXX</p>"
+
 
 @app.route('/predict', methods=['GET'])
 def predict():
     client_id = request.args.get('id')
-    
+
     if not client_id:
         return jsonify({"error": "ID client manquant"}), 400
+    if df is None or model is None:
+        return jsonify({"error": "Modèle ou données non disponibles"}), 500
 
     try:
         id_int = int(client_id)
         client_row = df[df['SK_ID_CURR'] == id_int]
     except ValueError:
-        return jsonify({"error": "ID client doit être un nombre"}), 400
+        return jsonify({"error": "L'ID doit être un nombre entier"}), 400
 
     if client_row.empty:
-        return jsonify({"error": f"Client ID {client_id} non trouvé"}), 404
+        return jsonify({"error": f"Client {client_id} non trouvé"}), 404
 
     try:
-        # 1. NETTOYAGE : Suppression des colonnes texte
-        client_data_clean = client_row.select_dtypes(exclude=['object'])
-        
-        # 2. ALIGNEMENT : On force les données à avoir les 261 colonnes du modèle
-        # On récupère la liste des colonnes attendues directement depuis le modèle chargé
-        expected_features = model.feature_name_
-        
-        # .reindex() va garder les bonnes colonnes et mettre 0 si une colonne manque
-        client_data_final = client_data_clean.reindex(columns=expected_features, fill_value=0)
-
-        # 3. PRÉDICTION : On utilise maintenant le DataFrame filtré à 261 colonnes
-        probability = model.predict_proba(client_data_final)[0][1]
-        
-        threshold = OPTIMAL_THRESHOLD
-        decision = "Refusé" if probability > threshold else "Accordé"
-
-        # 4. SHAP : interprétabilité locale (top 10 features)
-        # On utilise en priorité le calcul natif de LightGBM (pred_contrib=True) :
-        # il renvoie exactement les mêmes valeurs SHAP que la librairie shap,
-        # sans dépendre de TreeExplainer (plus léger en mémoire et plus fiable
-        # en production sur Render). La librairie shap reste un repli de secours.
-        shap_top = []
-        sv = None
-        try:
-            # pred_contrib renvoie un tableau (1, n_features + 1) :
-            # les n_features contributions + la valeur de base en dernière colonne.
-            contribs = model.booster_.predict(
-                client_data_final.values, pred_contrib=True
-            )
-            sv = contribs[0][:-1]  # on retire la valeur de base
-        except Exception as shap_err:
-            print(f"⚠️ pred_contrib indisponible : {shap_err}")
-            # Repli : librairie shap si l'explainer a pu être initialisé
-            if explainer is not None:
-                try:
-                    shap_vals = explainer.shap_values(client_data_final)
-                    if isinstance(shap_vals, list):
-                        sv = shap_vals[1][0]
-                    else:
-                        sv = shap_vals[0]
-                except Exception as exp_err:
-                    print(f"⚠️ shap fallback indisponible : {exp_err}")
-
-        if sv is not None:
-            # Top 10 features par valeur absolue
-            top_idx = sorted(range(len(sv)), key=lambda i: abs(sv[i]), reverse=True)[:10]
-            shap_top = [
-                {"feature": expected_features[i], "shap_value": round(float(sv[i]), 6)}
-                for i in top_idx
-            ]
-
-        return jsonify({
-            "status": "success",
-            "client_id": id_int,
-            "probability": float(probability),
-            "decision": decision,
-            "threshold": threshold,
-            "shap_values": shap_top
-        })
-
+        client_data = prepare_client_features(client_row)
+        return jsonify(build_payload(client_data, id_int))
     except Exception as e:
-        # En cas d'erreur, on affiche le message pour comprendre si besoin
-        return jsonify({"error": f"Erreur de prédiction : {str(e)}"}), 500
+        return jsonify({"error": f"Erreur lors du calcul : {str(e)}"}), 500
+
+
+@app.route('/simulate', methods=['POST'])
+def simulate():
+    if df is None or model is None:
+        return jsonify({"error": "Modèle ou données non disponibles"}), 500
+
+    body = request.get_json(silent=True) or {}
+    client_id = body.get('id')
+    overrides = body.get('overrides', {})
+
+    if client_id is None:
+        return jsonify({"error": "Champ 'id' manquant"}), 400
+
+    try:
+        id_int = int(client_id)
+    except (ValueError, TypeError):
+        return jsonify({"error": "L'ID doit être un nombre entier"}), 400
+
+    if not isinstance(overrides, dict):
+        return jsonify({"error": "Le champ 'overrides' doit être un objet JSON"}), 400
+
+    client_row = df[df['SK_ID_CURR'] == id_int]
+    if client_row.empty:
+        return jsonify({"error": f"Client {client_id} non trouvé"}), 404
+
+    try:
+        row = client_row.copy()
+        for feature, value in overrides.items():
+            if feature not in row.columns:
+                return jsonify({"error": f"Variable inconnue : {feature}"}), 400
+            row.loc[:, feature] = value
+
+        client_data = prepare_client_features(row)
+        result = build_payload(client_data, id_int, include_shap=False)
+        result["overrides_applied"] = overrides
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"error": f"Erreur lors de la simulation : {str(e)}"}), 500
+
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 10000))

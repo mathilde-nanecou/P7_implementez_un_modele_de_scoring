@@ -8,18 +8,12 @@ import requests
 import seaborn as sns
 import streamlit as st
 
-# ===========================================================================
-# Configuration de la page
-# ===========================================================================
 st.set_page_config(
-    page_title="Dashboard Scoring Credit - Pret a depenser",
+    page_title="Dashboard Scoring Crédit - Prêt à dépenser",
     page_icon="",
     layout="wide",
 )
 
-# ===========================================================================
-# URL de l'API
-# ===========================================================================
 API_PREDICT_URL = os.getenv(
     "SCORING_API_PREDICT_URL",
     "https://api-scoring-credit-mathilde.onrender.com/predict",
@@ -29,26 +23,22 @@ API_SIMULATE_URL = os.getenv(
     "https://api-scoring-credit-mathilde.onrender.com/simulate",
 )
 
-# ===========================================================================
-# Palette accessible (Wong colorblind-safe) -- contrastes WCAG AA
-# ===========================================================================
+# Palette accessible (Wong, daltonien-safe)
 PALETTE = {
-    "risk": "#D55E00",       # vermillon (risque)           -- 3.87:1 blanc, 4.89:1 sombre
-    "safe": "#0072B2",       # bleu (securite)              -- 5.19:1 blanc, 3.64:1 sombre
-    "neutral": "#555555",    # gris fonce                   -- 7.46:1 blanc, 2.58:1 sombre
-    "hist_pop": "#3B97BF",   # bleu moyen (population)      -- 3.30:1 blanc, 5.73:1 sombre
-    "hist_group": "#BF8400", # ambre fonce (groupe sim.)    -- 3.22:1 blanc, 5.86:1 sombre
-    "highlight": "#B56D94",  # rose fonce (client)          -- 3.52:1 blanc, 5.17:1 sombre
+    "risk": "#D55E00",
+    "safe": "#0072B2",
+    "neutral": "#555555",
+    "hist_pop": "#3B97BF",
+    "hist_group": "#BF8400",
+    "highlight": "#B56D94",
     "positive_shap": "#D55E00",
     "negative_shap": "#0072B2",
 }
 
-# Taille de police augmentee pour l'accessibilite
 FONT_SIZE_TITLE = 14
 FONT_SIZE_LABEL = 12
 FONT_SIZE_TICK = 10
 
-# Style CSS pour les descriptions accessibles (lecteurs d'ecran)
 st.markdown(
     """
     <style>
@@ -70,56 +60,49 @@ st.markdown(
 
 
 def alt_text(description: str) -> None:
-    """Insere un texte accessible cache visuellement mais lu par les lecteurs d'ecran."""
     st.markdown(
         f'<p class="sr-only" role="img" aria-label="{description}">{description}</p>',
         unsafe_allow_html=True,
     )
 
-# ===========================================================================
-# Dictionnaire de traduction des features techniques -> francais lisible
-# ===========================================================================
+
 FEATURE_LABELS = {
     "AMT_INCOME_TOTAL": "Revenu total annuel",
-    "AMT_CREDIT": "Montant du credit",
-    "AMT_ANNUITY": "Montant de l'annuite",
-    "AMT_GOODS_PRICE": "Prix du bien finance",
+    "AMT_CREDIT": "Montant du crédit",
+    "AMT_ANNUITY": "Montant de l'annuité",
+    "AMT_GOODS_PRICE": "Prix du bien financé",
     "CNT_CHILDREN": "Nombre d'enfants",
-    "DAYS_BIRTH": "Age",
-    "DAYS_EMPLOYED": "Anciennete emploi",
-    "DAYS_REGISTRATION": "Anciennete enregistrement",
-    "DAYS_ID_PUBLISH": "Anciennete piece d'identite",
+    "DAYS_BIRTH": "Âge",
+    "DAYS_EMPLOYED": "Ancienneté emploi",
+    "DAYS_REGISTRATION": "Ancienneté enregistrement",
+    "DAYS_ID_PUBLISH": "Ancienneté pièce d'identité",
     "EXT_SOURCE_1": "Score externe 1",
     "EXT_SOURCE_2": "Score externe 2",
     "EXT_SOURCE_3": "Score externe 3",
     "PAYMENT_RATE": "Taux de paiement",
     "INSTAL_DPD_MEAN": "Retard moyen paiements",
-    "INSTAL_AMT_PAYMENT_SUM": "Somme paiements passes",
-    "PREV_APP_CREDIT_PERC_MEAN": "Ratio credit/demande moyen",
-    "APPROVED_CNT_PAYMENT_MEAN": "Nb paiements approuves moyen",
-    "ACTIVE_DAYS_CREDIT_MEAN": "Anciennete credits actifs moy.",
-    "CLOSED_DAYS_CREDIT_MAX": "Duree max credit cloture",
-    "REGION_POPULATION_RELATIVE": "Densite population region",
+    "INSTAL_AMT_PAYMENT_SUM": "Somme paiements passés",
+    "PREV_APP_CREDIT_PERC_MEAN": "Ratio crédit/demande moyen",
+    "APPROVED_CNT_PAYMENT_MEAN": "Nb paiements approuvés moyen",
+    "ACTIVE_DAYS_CREDIT_MEAN": "Ancienneté crédits actifs moy.",
+    "CLOSED_DAYS_CREDIT_MAX": "Durée max crédit clôturé",
+    "REGION_POPULATION_RELATIVE": "Densité population région",
     "HOUR_APPR_PROCESS_START": "Heure de la demande",
     "CODE_GENDER": "Genre",
-    "FLAG_OWN_CAR": "Possede une voiture",
-    "FLAG_OWN_REALTY": "Possede un bien immobilier",
-    "NAME_EDUCATION_TYPE": "Niveau d'education",
+    "FLAG_OWN_CAR": "Possède une voiture",
+    "FLAG_OWN_REALTY": "Possède un bien immobilier",
+    "NAME_EDUCATION_TYPE": "Niveau d'éducation",
     "NAME_FAMILY_STATUS": "Situation familiale",
     "ORGANIZATION_TYPE": "Type d'organisation employeur",
-    "OWN_CAR_AGE": "Age du vehicule",
+    "OWN_CAR_AGE": "Âge du véhicule",
     "TOTALAREA_MODE": "Surface du logement",
 }
 
 
 def human_label(feature_name: str) -> str:
-    """Renvoie le label lisible d'une feature, ou le nom technique si inconnu."""
     return FEATURE_LABELS.get(feature_name, feature_name)
 
 
-# ===========================================================================
-# Chargement des donnees
-# ===========================================================================
 @st.cache_data
 def load_data() -> pd.DataFrame:
     data_paths = [
@@ -147,9 +130,6 @@ def load_feature_importances() -> pd.DataFrame:
     return pd.DataFrame()
 
 
-# ===========================================================================
-# Appels API
-# ===========================================================================
 def get_predict_payload(client_id: int) -> tuple[dict, str]:
     try:
         response = requests.get(
@@ -170,9 +150,6 @@ def get_predict_payload(client_id: int) -> tuple[dict, str]:
     return response.json(), ""
 
 
-# ===========================================================================
-# Utilitaires
-# ===========================================================================
 def get_numeric_features(dataframe: pd.DataFrame) -> list[str]:
     numeric_columns = dataframe.select_dtypes(include=["number", "bool"]).columns.tolist()
     return [col for col in numeric_columns if col != "SK_ID_CURR"]
@@ -184,7 +161,6 @@ def describe_position(series: pd.Series, value: float) -> str:
 
 
 def format_client_value(field: str, value) -> str:
-    """Formate une valeur client pour un affichage lisible."""
     if pd.isna(value):
         return "N/A"
     if field == "DAYS_BIRTH":
@@ -200,11 +176,7 @@ def format_client_value(field: str, value) -> str:
     return str(value)
 
 
-# ===========================================================================
-# Jauge de score Plotly
-# ===========================================================================
 def build_score_gauge(probability: float, threshold: float) -> go.Figure:
-    """Construit une jauge coloree indiquant la probabilite de defaut."""
     fig = go.Figure(
         go.Indicator(
             mode="gauge+number+delta",
@@ -216,7 +188,7 @@ def build_score_gauge(probability: float, threshold: float) -> go.Figure:
                 "decreasing": {"color": PALETTE["safe"]},
                 "suffix": " pts",
             },
-            title={"text": "Probabilite de defaut", "font": {"size": 18}},
+            title={"text": "Probabilité de défaut", "font": {"size": 18}},
             gauge={
                 "axis": {"range": [0, 100], "tickwidth": 2, "tickfont": {"size": 13}},
                 "bar": {"color": PALETTE["neutral"], "thickness": 0.25},
@@ -234,26 +206,17 @@ def build_score_gauge(probability: float, threshold: float) -> go.Figure:
             },
         )
     )
-    fig.update_layout(
-        height=300,
-        margin=dict(t=60, b=20, l=40, r=40),
-    )
+    fig.update_layout(height=300, margin=dict(t=60, b=20, l=40, r=40))
     return fig
 
 
-# ===========================================================================
-# Chargement
-# ===========================================================================
 df = load_data()
 feature_importances = load_feature_importances()
 
-# ===========================================================================
-# En-tete
-# ===========================================================================
-st.title("Dashboard de Credit Scoring")
+st.title("Dashboard de Crédit Scoring")
 st.caption(
-    "Outil d'aide a la decision pour les charges de relation client. "
-    "Permet d'expliquer de maniere transparente les decisions d'octroi de credit."
+    "Outil d'aide à la décision pour les chargés de relation client. "
+    "Permet d'expliquer de manière transparente les décisions d'octroi de crédit."
 )
 
 if df.empty:
@@ -261,18 +224,15 @@ if df.empty:
     st.stop()
 
 if "SK_ID_CURR" not in df.columns:
-    st.error("La colonne SK_ID_CURR est absente des donnees.")
+    st.error("La colonne SK_ID_CURR est absente des données.")
     st.stop()
 
 available_ids = sorted(df["SK_ID_CURR"].dropna().astype(int).unique().tolist())
 numeric_features = get_numeric_features(df)
 
-# ===========================================================================
-# Barre laterale
-# ===========================================================================
-st.sidebar.header("Parametres")
+st.sidebar.header("Paramètres")
 selected_id = st.sidebar.selectbox(
-    "Selectionner un client (ID)",
+    "Sélectionner un client (ID)",
     options=available_ids,
     index=0,
     help="Identifiant unique du dossier client.",
@@ -282,29 +242,21 @@ comparison_feature = st.sidebar.selectbox(
     options=numeric_features,
     index=numeric_features.index("AMT_INCOME_TOTAL") if "AMT_INCOME_TOTAL" in numeric_features else 0,
     format_func=human_label,
-    help="Variable utilisee pour comparer le client a la population.",
+    help="Variable utilisée pour comparer le client à la population.",
 )
 similarity_window = st.sidebar.slider(
-    "Fenetre de similarite (+/- %)",
+    "Fenêtre de similarité (+/- %)",
     min_value=5,
     max_value=50,
     value=20,
     step=5,
-    help="Pourcentage autour de la valeur client pour definir le groupe de clients similaires.",
+    help="Pourcentage autour de la valeur client pour définir le groupe de clients similaires.",
 )
 run_button = st.sidebar.button("Analyser ce client", type="primary")
 
-# ===========================================================================
-# Section 1 : Importance globale du modele
-# ===========================================================================
-st.header("Importance globale du modele")
+st.header("Importance globale du modèle")
 if not feature_importances.empty and {"Feature", "Importance"}.issubset(feature_importances.columns):
-    top_n = st.slider(
-        "Nombre de variables globales a afficher",
-        min_value=5,
-        max_value=20,
-        value=10,
-    )
+    top_n = st.slider("Nombre de variables globales à afficher", min_value=5, max_value=20, value=10)
     top_global = (
         feature_importances.sort_values("Importance", ascending=False)
         .head(top_n)
@@ -312,35 +264,32 @@ if not feature_importances.empty and {"Feature", "Importance"}.issubset(feature_
     )
 
     fig_global, ax_global = plt.subplots(figsize=(9, 0.45 * top_n + 1))
-    bars = ax_global.barh(
+    ax_global.barh(
         [human_label(f) for f in top_global["Feature"]],
         top_global["Importance"],
         color=PALETTE["safe"],
     )
     ax_global.set_xlabel("Importance", fontsize=FONT_SIZE_LABEL)
     ax_global.set_title(
-        "Top variables les plus influentes dans le modele (global)",
+        "Top variables les plus influentes dans le modèle (global)",
         fontsize=FONT_SIZE_TITLE,
     )
     ax_global.tick_params(labelsize=FONT_SIZE_TICK)
     plt.tight_layout()
     st.pyplot(fig_global)
     alt_text(
-        f"Graphique a barres horizontales montrant les {top_n} variables les plus importantes du modele. "
-        f"Les 3 premieres sont : {', '.join(top_global['Feature'].tail(3).iloc[::-1].tolist())}."
+        f"Graphique à barres horizontales montrant les {top_n} variables les plus importantes du modèle. "
+        f"Les 3 premières sont : {', '.join(top_global['Feature'].tail(3).iloc[::-1].tolist())}."
     )
     st.caption(
-        "Lecture : plus la barre est longue, plus la variable a d'influence sur les predictions du modele "
-        "pour l'ensemble des clients. Cela ne presage pas du sens de l'influence (positif ou negatif)."
+        "Lecture : plus la barre est longue, plus la variable a d'influence sur les prédictions du modèle "
+        "pour l'ensemble des clients. Cela ne présage pas du sens de l'influence (positif ou négatif)."
     )
 else:
-    st.info("Fichier feature_importances.csv non trouve ou format inattendu.")
+    st.info("Fichier feature_importances.csv non trouvé ou format inattendu.")
 
-# ===========================================================================
-# Attente de l'action utilisateur
-# ===========================================================================
 if not run_button:
-    st.info("Choisissez un client dans la barre laterale puis cliquez sur **Analyser ce client**.")
+    st.info("Choisissez un client dans la barre latérale puis cliquez sur **Analyser ce client**.")
     st.stop()
 
 client_row = df[df["SK_ID_CURR"].astype(int) == int(selected_id)]
@@ -350,10 +299,7 @@ if client_row.empty:
 
 client_data = client_row.iloc[0]
 
-# ===========================================================================
-# Appel API
-# ===========================================================================
-with st.spinner("Recuperation du score via l'API..."):
+with st.spinner("Récupération du score via l'API..."):
     payload, api_error = get_predict_payload(int(selected_id))
 
 if api_error:
@@ -365,43 +311,32 @@ threshold = float(payload.get("threshold", 0.5))
 decision = payload.get("decision", "Inconnue")
 distance_to_threshold = probability - threshold
 
-# ===========================================================================
-# Section 2 : Score et decision
-# ===========================================================================
 st.header(f"Analyse du client {selected_id}")
 
-# -- Jauge Plotly --
 gauge_col, metrics_col = st.columns([3, 2])
 
 with gauge_col:
-    st.plotly_chart(
-        build_score_gauge(probability, threshold),
-        use_container_width=True,
-    )
+    st.plotly_chart(build_score_gauge(probability, threshold), use_container_width=True)
 
 with metrics_col:
-    st.metric("Probabilite de defaut", f"{probability:.2%}")
-    st.metric("Seuil metier", f"{threshold:.2%}")
-    st.metric("Ecart au seuil", f"{distance_to_threshold:+.2%}")
-    st.metric("Decision", decision)
+    st.metric("Probabilité de défaut", f"{probability:.2%}")
+    st.metric("Seuil métier", f"{threshold:.2%}")
+    st.metric("Écart au seuil", f"{distance_to_threshold:+.2%}")
+    st.metric("Décision", decision)
 
-# -- Interpretation textuelle --
 if probability >= threshold:
     st.warning(
-        f"**Interpretation** : la probabilite de defaut ({probability:.2%}) est superieure "
-        f"au seuil metier ({threshold:.2%}). Le dossier est **refuse**. "
-        f"L'ecart au seuil est de {abs(distance_to_threshold):.2%} points."
+        f"**Interprétation** : la probabilité de défaut ({probability:.2%}) est supérieure "
+        f"au seuil métier ({threshold:.2%}). Le dossier est **refusé**. "
+        f"L'écart au seuil est de {abs(distance_to_threshold):.2%} points."
     )
 else:
     st.success(
-        f"**Interpretation** : la probabilite de defaut ({probability:.2%}) est inferieure "
-        f"au seuil metier ({threshold:.2%}). Le dossier est **accepte**. "
-        f"La marge de securite est de {abs(distance_to_threshold):.2%} points."
+        f"**Interprétation** : la probabilité de défaut ({probability:.2%}) est inférieure "
+        f"au seuil métier ({threshold:.2%}). Le dossier est **accepté**. "
+        f"La marge de sécurité est de {abs(distance_to_threshold):.2%} points."
     )
 
-# ===========================================================================
-# Section 3 : Informations descriptives du client
-# ===========================================================================
 st.subheader("Informations descriptives du client")
 key_fields = [
     "AMT_INCOME_TOTAL",
@@ -423,15 +358,12 @@ if present_fields:
         display_value = format_client_value(field, value)
         metric_columns[idx % n_cols].metric(human_label(field), display_value)
 else:
-    st.info("Aucun champ descriptif standard trouve dans les donnees.")
+    st.info("Aucun champ descriptif standard trouvé dans les données.")
 
-# ===========================================================================
-# Section 4 : Explication locale (SHAP) vs Importance globale
-# ===========================================================================
 st.subheader("Explication du score : importance locale vs globale")
 st.caption(
-    "A gauche : les variables qui ont le plus influence le score **de ce client specifique** (SHAP). "
-    "A droite : les variables les plus importantes pour le modele **en general**. "
+    "À gauche : les variables qui ont le plus influencé le score **de ce client spécifique** (SHAP). "
+    "À droite : les variables les plus importantes pour le modèle **en général**. "
     "Comparer les deux permet de voir si ce client est atypique."
 )
 
@@ -439,7 +371,7 @@ shap_values = payload.get("shap_values", [])
 shap_col, global_col = st.columns(2)
 
 with shap_col:
-    st.markdown("**Importance locale (SHAP) -- ce client**")
+    st.markdown("**Importance locale (SHAP) — ce client**")
     if shap_values:
         shap_df = pd.DataFrame(shap_values)
         if {"feature", "shap_value"}.issubset(shap_df.columns):
@@ -456,7 +388,7 @@ with shap_col:
             )
             ax_shap.axvline(0, color=PALETTE["neutral"], linewidth=1)
             ax_shap.set_title(
-                "Variables poussant vers le risque (+) ou la securite (-)",
+                "Variables poussant vers le risque (+) ou la sécurité (-)",
                 fontsize=FONT_SIZE_TITLE,
             )
             ax_shap.set_xlabel("Valeur SHAP", fontsize=FONT_SIZE_LABEL)
@@ -467,11 +399,11 @@ with shap_col:
             n_neg = len(shap_df) - n_pos
             alt_text(
                 f"Graphique SHAP pour le client {selected_id}. "
-                f"{n_pos} variables poussent vers le risque, {n_neg} vers la securite. "
+                f"{n_pos} variables poussent vers le risque, {n_neg} vers la sécurité. "
                 f"Variable la plus influente : {human_label(shap_df.iloc[-1]['feature'])}."
             )
             st.caption(
-                "Lecture : les barres vermillon (vers la droite) augmentent le risque estime. "
+                "Lecture : les barres vermillon (vers la droite) augmentent le risque estimé. "
                 "Les barres bleues (vers la gauche) le diminuent."
             )
         else:
@@ -480,7 +412,7 @@ with shap_col:
         st.info("Aucune explication locale transmise par l'API pour ce client.")
 
 with global_col:
-    st.markdown("**Importance globale -- ensemble du modele**")
+    st.markdown("**Importance globale — ensemble du modèle**")
     if not feature_importances.empty and {"Feature", "Importance"}.issubset(feature_importances.columns):
         n_display = len(shap_df) if shap_values and "feature" in pd.DataFrame(shap_values).columns else 10
         top_global_compare = (
@@ -494,10 +426,7 @@ with global_col:
             top_global_compare["Importance"],
             color=PALETTE["safe"],
         )
-        ax_glob2.set_title(
-            f"Top {n_display} variables globales",
-            fontsize=FONT_SIZE_TITLE,
-        )
+        ax_glob2.set_title(f"Top {n_display} variables globales", fontsize=FONT_SIZE_TITLE)
         ax_glob2.set_xlabel("Importance", fontsize=FONT_SIZE_LABEL)
         ax_glob2.tick_params(labelsize=FONT_SIZE_TICK)
         plt.tight_layout()
@@ -507,16 +436,13 @@ with global_col:
             f"Variable la plus importante : {human_label(top_global_compare['Feature'].iloc[-1])}."
         )
         st.caption(
-            "Lecture : importance moyenne de chaque variable sur l'ensemble des predictions. "
-            "Cela ne presage pas du sens (positif ou negatif) de l'influence."
+            "Lecture : importance moyenne de chaque variable sur l'ensemble des prédictions. "
+            "Cela ne présage pas du sens (positif ou négatif) de l'influence."
         )
     else:
         st.info("Fichier feature_importances.csv non disponible pour la comparaison.")
 
-# ===========================================================================
-# Section 5 : Comparaison client vs population / groupe similaire
-# ===========================================================================
-st.subheader("Comparaison du client a la population")
+st.subheader("Comparaison du client à la population")
 st.caption(
     f"Distribution de la variable **{human_label(comparison_feature)}** : "
     "population totale (bleu clair) et groupe de clients similaires (ambre)."
@@ -526,9 +452,8 @@ feature_series = pd.to_numeric(df[comparison_feature], errors="coerce").dropna()
 client_value = pd.to_numeric(pd.Series([client_data[comparison_feature]]), errors="coerce").iloc[0]
 
 if pd.isna(client_value) or feature_series.empty:
-    st.warning("La variable selectionnee ne contient pas assez de donnees numeriques.")
+    st.warning("La variable sélectionnée ne contient pas assez de données numériques.")
 else:
-    # Groupe similaire
     margin = abs(client_value) * (similarity_window / 100) if client_value != 0 else feature_series.std() * 0.5
     group_min = client_value - margin
     group_max = client_value + margin
@@ -538,20 +463,13 @@ else:
     similar_group = df[similar_mask]
     similar_series = pd.to_numeric(similar_group[comparison_feature], errors="coerce").dropna()
 
-    # Metriques
     stat_col1, stat_col2, stat_col3 = st.columns(3)
     stat_col1.metric("Position (population totale)", describe_position(feature_series, client_value))
     stat_col2.metric("Clients similaires", f"{len(similar_group)} clients")
     if not similar_series.empty:
-        stat_col3.metric(
-            "Position (groupe similaire)",
-            describe_position(similar_series, client_value),
-        )
+        stat_col3.metric("Position (groupe similaire)", describe_position(similar_series, client_value))
 
-    # Histogramme superpose
     fig_comp, ax_comp = plt.subplots(figsize=(10, 5))
-
-    # Population totale
     sns.histplot(
         feature_series,
         bins=40,
@@ -560,7 +478,6 @@ else:
         label="Population totale",
         ax=ax_comp,
     )
-    # Groupe similaire
     if not similar_series.empty and len(similar_series) > 1:
         sns.histplot(
             similar_series,
@@ -570,8 +487,6 @@ else:
             label=f"Groupe similaire ({len(similar_group)})",
             ax=ax_comp,
         )
-
-    # Position client
     ax_comp.axvline(
         client_value,
         color=PALETTE["highlight"],
@@ -579,19 +494,14 @@ else:
         linewidth=2.5,
         label=f"Client {selected_id}",
     )
-    # Mediane population
     ax_comp.axvline(
         feature_series.median(),
         color=PALETTE["neutral"],
         linestyle=":",
         linewidth=2,
-        label="Mediane population",
+        label="Médiane population",
     )
-
-    ax_comp.set_title(
-        f"Distribution de {human_label(comparison_feature)}",
-        fontsize=FONT_SIZE_TITLE,
-    )
+    ax_comp.set_title(f"Distribution de {human_label(comparison_feature)}", fontsize=FONT_SIZE_TITLE)
     ax_comp.set_xlabel(human_label(comparison_feature), fontsize=FONT_SIZE_LABEL)
     ax_comp.set_ylabel("Nombre de clients", fontsize=FONT_SIZE_LABEL)
     ax_comp.tick_params(labelsize=FONT_SIZE_TICK)
@@ -601,28 +511,20 @@ else:
     alt_text(
         f"Histogramme de la variable {human_label(comparison_feature)}. "
         f"Valeur du client : {format_client_value(comparison_feature, client_value)}. "
-        f"Mediane population : {format_client_value(comparison_feature, feature_series.median())}. "
+        f"Médiane population : {format_client_value(comparison_feature, feature_series.median())}. "
         f"Groupe similaire : {len(similar_group)} clients."
     )
     st.caption(
-        f"Lecture : la ligne rose en pointilles marque la valeur du client ({format_client_value(comparison_feature, client_value)}). "
-        f"La ligne grise represente la mediane de la population ({format_client_value(comparison_feature, feature_series.median())}). "
-        "L'histogramme ambre montre la repartition du groupe de clients similaires."
+        f"Lecture : la ligne rose en pointillés marque la valeur du client ({format_client_value(comparison_feature, client_value)}). "
+        f"La ligne grise représente la médiane de la population ({format_client_value(comparison_feature, feature_series.median())}). "
+        "L'histogramme ambre montre la répartition du groupe de clients similaires."
     )
 
-# ===========================================================================
-# Section 6 : Analyse bivariee
-# ===========================================================================
-st.subheader("Analyse bivariee")
-st.caption("Visualisez la relation entre deux variables et situez le client par rapport a la population.")
+st.subheader("Analyse bivariée")
+st.caption("Visualisez la relation entre deux variables et situez le client par rapport à la population.")
 
 bivar_cols = st.columns(2)
-x_feature = bivar_cols[0].selectbox(
-    "Variable X",
-    options=numeric_features,
-    index=0,
-    format_func=human_label,
-)
+x_feature = bivar_cols[0].selectbox("Variable X", options=numeric_features, index=0, format_func=human_label)
 y_feature = bivar_cols[1].selectbox(
     "Variable Y",
     options=numeric_features,
@@ -631,7 +533,7 @@ y_feature = bivar_cols[1].selectbox(
 )
 
 if x_feature == y_feature:
-    st.info("Selectionnez deux variables differentes pour l'analyse bivariee.")
+    st.info("Sélectionnez deux variables différentes pour l'analyse bivariée.")
 else:
     bivar_df = df[[x_feature, y_feature, "SK_ID_CURR"]].copy()
     bivar_df[x_feature] = pd.to_numeric(bivar_df[x_feature], errors="coerce")
@@ -662,7 +564,6 @@ else:
             zorder=5,
             label=f"Client {selected_id}",
         )
-
     ax_bivar.set_title(
         f"Relation entre {human_label(x_feature)} et {human_label(y_feature)}",
         fontsize=FONT_SIZE_TITLE,
@@ -675,20 +576,17 @@ else:
     st.pyplot(fig_bivar)
     alt_text(
         f"Nuage de points montrant la relation entre {human_label(x_feature)} et {human_label(y_feature)}. "
-        f"{len(sample_df)} clients affiches. Le client {selected_id} est represente par une etoile."
+        f"{len(sample_df)} clients affichés. Le client {selected_id} est représenté par une étoile."
     )
     st.caption(
-        f"Lecture : chaque point bleu clair represente un client de la base. "
-        f"L'etoile rose represente le client {selected_id}."
+        f"Lecture : chaque point bleu clair représente un client de la base. "
+        f"L'étoile rose représente le client {selected_id}."
     )
 
-# ===========================================================================
-# Section 7 : Simulation de scenario (multi-variables)
-# ===========================================================================
-st.subheader("Simulation de scenario")
+st.subheader("Simulation de scénario")
 st.caption(
-    "Modifiez jusqu'a 3 variables du dossier client et recalculez le score via l'API. "
-    "Cela permet d'explorer l'impact de changements sur la decision."
+    "Modifiez jusqu'à 3 variables du dossier client et recalculez le score via l'API. "
+    "Cela permet d'explorer l'impact de changements sur la décision."
 )
 
 with st.form("simulation_form"):
@@ -707,23 +605,16 @@ with st.form("simulation_form"):
                 current = float(
                     pd.to_numeric(pd.Series([client_data[feat]]), errors="coerce").fillna(0).iloc[0]
                 )
-                new_val = st.number_input(
-                    f"Nouvelle valeur",
-                    value=current,
-                    key=f"sim_val_{i}",
-                )
+                new_val = st.number_input(f"Nouvelle valeur", value=current, key=f"sim_val_{i}")
                 overrides[feat] = new_val
 
     simulate = st.form_submit_button("Lancer la simulation", type="primary")
 
 if simulate:
     if not overrides:
-        st.info("Selectionnez au moins une variable a modifier.")
+        st.info("Sélectionnez au moins une variable à modifier.")
     else:
-        simulation_payload = {
-            "id": int(selected_id),
-            "overrides": overrides,
-        }
+        simulation_payload = {"id": int(selected_id), "overrides": overrides}
         try:
             sim_response = requests.post(API_SIMULATE_URL, json=simulation_payload, timeout=90)
             if sim_response.status_code == 200:
@@ -732,50 +623,41 @@ if simulate:
                 sim_decision = sim_data.get("decision", "Inconnue")
                 delta_prob = sim_prob - probability
 
-                st.success("Simulation effectuee.")
+                st.success("Simulation effectuée.")
 
                 sim_res_cols = st.columns(4)
-                sim_res_cols[0].metric("Probabilite initiale", f"{probability:.2%}")
-                sim_res_cols[1].metric("Probabilite simulee", f"{sim_prob:.2%}", delta=f"{delta_prob:+.2%}")
-                sim_res_cols[2].metric("Decision initiale", decision)
-                sim_res_cols[3].metric("Decision simulee", sim_decision)
+                sim_res_cols[0].metric("Probabilité initiale", f"{probability:.2%}")
+                sim_res_cols[1].metric("Probabilité simulée", f"{sim_prob:.2%}", delta=f"{delta_prob:+.2%}")
+                sim_res_cols[2].metric("Décision initiale", decision)
+                sim_res_cols[3].metric("Décision simulée", sim_decision)
 
-                # Resume textuel
-                changes_text = ", ".join(
-                    [f"**{human_label(k)}** = {v}" for k, v in overrides.items()]
-                )
+                changes_text = ", ".join([f"**{human_label(k)}** = {v}" for k, v in overrides.items()])
                 st.info(
-                    f"Variables modifiees : {changes_text}. "
-                    f"La probabilite passe de {probability:.2%} a {sim_prob:.2%} "
+                    f"Variables modifiées : {changes_text}. "
+                    f"La probabilité passe de {probability:.2%} à {sim_prob:.2%} "
                     f"(variation de {delta_prob:+.2%} points)."
                 )
             else:
                 st.warning(
                     "Endpoint /simulate indisponible sur l'API actuelle. "
-                    "Deployez la version API mise a jour pour activer cette fonctionnalite."
+                    "Déployez la version API mise à jour pour activer cette fonctionnalité."
                 )
         except requests.RequestException as exc:
             st.warning(f"Simulation impossible pour le moment : {exc}")
 
-# ===========================================================================
-# Section 8 : Note sur l'accessibilite
-# ===========================================================================
 st.divider()
-st.subheader("Accessibilite")
+st.subheader("Accessibilité")
 st.markdown(
     """
-- **Palette accessible** : couleurs choisies pour etre distinguables par les personnes daltoniennes
-  (palette Wong adaptee). Tous les elements graphiques respectent un contraste minimum de 3:1 (WCAG 1.4.11 AA).
-- **Double codage** (WCAG 1.4.1) : l'information n'est jamais vehiculee uniquement par la couleur.
-  Chaque graphique est accompagne d'un texte de lecture decrivant ce qu'il montre.
-- **Contenu non textuel** (WCAG 1.1.1) : chaque graphique dispose d'une description accessible
-  invisible a l'ecran mais lue par les lecteurs d'ecran (attribut aria-label).
-- **Valeurs explicites** : le score, le seuil et l'ecart sont affiches en texte numerique clair.
-- **Titres et structure** (WCAG 2.4.2, 2.4.6) : titre de page descriptif, hierarchie de titres
-  coherente (h1/h2/h3), tous les graphiques ont un titre, des labels d'axes et une legende.
-- **Redimensionnement** (WCAG 1.4.4) : l'interface est responsive et le texte peut etre agrandi
-  a 200%% via le zoom navigateur sans perte de fonctionnalite.
-- **Labels en francais** : les noms techniques des variables sont traduits en termes comprehensibles
-  pour les personnes non expertes en data science.
+- **Palette accessible** : couleurs choisies pour être distinguables par les personnes daltoniennes
+  (palette Wong). Tous les éléments graphiques respectent un contraste minimum de 3:1 (WCAG AA).
+- **Double codage** : l'information n'est jamais véhiculée uniquement par la couleur.
+  Chaque graphique est accompagné d'un texte de lecture décrivant ce qu'il montre.
+- **Contenu non textuel** : chaque graphique dispose d'une description accessible lue par les lecteurs d'écran.
+- **Valeurs explicites** : le score, le seuil et l'écart sont affichés en texte numérique clair.
+- **Titres et structure** : titre de page descriptif, hiérarchie de titres cohérente,
+  tous les graphiques ont un titre, des labels d'axes et une légende.
+- **Labels en français** : les noms techniques des variables sont traduits en termes compréhensibles
+  pour les non-experts.
 """
 )
