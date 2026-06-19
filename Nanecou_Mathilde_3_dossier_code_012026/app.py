@@ -38,6 +38,28 @@ try:
 except Exception as e:
     print(f"Seuil par defaut utilise (0.5) : {e}")
 
+# Pré-calcul des valeurs SHAP pour tous les clients au démarrage.
+# Sur Render free (CPU bridé), pred_contrib sur 1000 arbres × 261 features
+# prend trop longtemps à la requête (> timeout gunicorn 30s).
+# On calcule une fois au boot et on stocke dans un dict indexé par SK_ID_CURR.
+SHAP_CACHE = {}
+if model is not None and df is not None:
+    try:
+        features = model.feature_name_
+        clean = df.select_dtypes(exclude=['object']).reindex(columns=features, fill_value=0)
+        contribs = model.booster_.predict(clean.values, pred_contrib=True)
+        sv_matrix = contribs[:, :-1]
+        for i, client_id in enumerate(df['SK_ID_CURR'].values):
+            sv = sv_matrix[i]
+            indices = sorted(range(len(sv)), key=lambda j: abs(sv[j]), reverse=True)[:10]
+            SHAP_CACHE[int(client_id)] = [
+                {"feature": features[j], "shap_value": round(float(sv[j]), 6)}
+                for j in indices
+            ]
+        print(f"SHAP pre-calcule pour {len(SHAP_CACHE)} clients")
+    except Exception as e:
+        print(f"SHAP pre-calcul indisponible : {e}")
+
 
 def prepare_client_features(client_frame):
     expected_features = model.feature_name_
@@ -45,21 +67,7 @@ def prepare_client_features(client_frame):
     return clean.reindex(columns=expected_features, fill_value=0)
 
 
-def get_shap_top(client_data, expected_features):
-    shap_top = []
-    try:
-        contribs = model.booster_.predict(client_data.values, pred_contrib=True)
-        sv = contribs[0][:-1]
-        indices = sorted(range(len(sv)), key=lambda i: abs(sv[i]), reverse=True)[:10]
-        for i in indices:
-            shap_top.append({"feature": expected_features[i], "shap_value": float(sv[i])})
-    except Exception as e:
-        print(f"SHAP indisponible : {e}")
-    return shap_top
-
-
 def build_payload(client_data, client_id, include_shap=True):
-    features = model.feature_name_
     prob = model.predict_proba(client_data)[0][1]
     decision = "Refusé" if prob > OPTIMAL_THRESHOLD else "Accordé"
     result = {
@@ -70,7 +78,7 @@ def build_payload(client_data, client_id, include_shap=True):
         "threshold": OPTIMAL_THRESHOLD,
     }
     if include_shap:
-        result["shap_values"] = get_shap_top(client_data, features)
+        result["shap_values"] = SHAP_CACHE.get(int(client_id), [])
     return result
 
 
